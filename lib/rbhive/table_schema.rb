@@ -10,6 +10,7 @@ module RBHive
       @collection_sep = options[:collection_sep] || "|"
       @columns = []
       @partitions = []
+      @clustering = nil
       @serde_name = nil
       @serde_properties = {}
       instance_eval(&blk) if blk
@@ -21,6 +22,10 @@ module RBHive
 
     def partition(name, type, comment=nil)
       @partitions << Column.new(name, type, comment)
+    end
+
+    def clustered_by(columns, number_of_buckets, sort_by_clause=nil)
+      @clustering = Clustering.new(columns, number_of_buckets, sort_by_clause)
     end
 
     def serde(name, properties={})
@@ -80,7 +85,7 @@ module RBHive
 
     def table_statement
       comment_string = (@comment.nil? ? '' : " COMMENT '#{@comment}'")
-      %[`#{@name}` #{column_statement}#{comment_string}\n#{partition_statement}]
+      %[`#{@name}` #{column_statement}#{comment_string}\n#{partition_statement}\n#{clustering_statement}]
     end
 
     def location
@@ -102,6 +107,11 @@ module RBHive
       "PARTITIONED BY (\n#{cols}\n)"
     end
 
+    def clustering_statement
+      return "" if @clustering.nil?
+      @clustering.statement
+    end
+
     class Column
       attr_reader :name, :type, :comment
       def initialize(name, type, comment=nil)
@@ -111,6 +121,20 @@ module RBHive
       def to_s
         comment_string = @comment.nil? ? '' : " COMMENT '#{@comment}'"
         "`#{@name}` #{@type.to_s.upcase}#{comment_string}"
+      end
+    end
+
+    class Clustering
+      attr_reader :columns, :sort_by_clause, :number_of_buckets
+      def initialize columns, number_of_buckets, sort_by_clause
+        @columns = [*columns]
+        @number_of_buckets = number_of_buckets
+        @sort_by_clause = sort_by_clause
+      end
+
+      def statement
+        sort_clause = sort_by_clause.nil? ? '' : "SORTED BY (#{@sort_by_clause}) "
+        "CLUSTERED BY (#{@columns.join(', ')}) #{sort_clause}INTO #{@number_of_buckets} BUCKETS"
       end
     end
   end
