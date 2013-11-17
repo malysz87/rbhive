@@ -143,6 +143,8 @@ We have not tested the SASL connection, as we don't run SASL; pull requests and 
 
       partition 'dated', :string, 'The date money was given'
       partition 'country', :string, 'The country the person resides in'
+
+      clustered_by 'country', 32, "name ASC"
     end
 
 Then for Hiveserver:
